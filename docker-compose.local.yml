@@ -1,0 +1,82 @@
+# Full local-PC runtime: dashboard, worker, PostgreSQL, and Redis.
+# Start with: docker compose -f docker-compose.local.yml up --build -d
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openreply
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d openreply"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    build: .
+    env_file: .env.local
+    command: ["sh", "-c", "node scripts/validate-local-env.mjs && npm run db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  dashboard:
+    build: .
+    env_file: .env.local
+    command: ["sh", "-c", "node scripts/validate-local-env.mjs && npm run start"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build: .
+    env_file: .env.local
+    command: ["sh", "-c", "node scripts/validate-local-env.mjs && npm run worker"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  cron:
+    build: .
+    env_file: .env.local
+    environment:
+      CRON_BASE_URL: http://dashboard:3000
+    command: ["sh", "-c", "node scripts/validate-local-env.mjs && sh scripts/cron.sh"]
+    restart: unless-stopped
+    depends_on:
+      dashboard:
+        condition: service_started
+
+volumes:
+  pgdata:
+  redisdata:

@@ -14,57 +14,29 @@ Launch the first Pour&Prompt Instagram automation using OpenReply.
 - Initial keywords: `PROMPT`, `INVENTORY`, `COSTING`, `TRAINING`, `AUTOMATE`
 
 ## Architecture
-- Vercel: Next.js web app, dashboard, OAuth callback, webhook endpoint
-- Railway: worker, PostgreSQL, Redis
+- Local PC: dashboard, webhook endpoint, worker, scheduler, PostgreSQL, Redis
+- Local password login: one Pour&Prompt administrator; no email delivery service
 - Meta Developer App: Instagram Login plus `comments` and `messages` webhooks
-- Resend or SMTP: magic-link login
+- Secure HTTPS tunnel: only added after local testing, so Meta can reach the
+  locally hosted webhook endpoint
 
 ## Deployment sequence
 
-### 1. Railway
-Create a new Railway project with:
-- PostgreSQL
-- Redis
-- Worker service sourced from this repository
+### 1. Start the local PC stack
+Follow [the local PC guide](local-pc.md). It starts PostgreSQL, Redis, the
+dashboard, the DM worker, and the scheduler with one Docker command. The
+database and Redis are private to Docker; the dashboard is only available on
+this PC at `http://localhost:3000`.
 
-Worker commands:
+### 2. Confirm the local dashboard
+Sign in with the local dashboard password. Do not enter Meta credentials yet.
 
-```text
-Build Command: npm run db:generate
-Start Command: npm run worker
-```
+### 3. Prepare a public webhook URL
+After the local stack is healthy, create a secure HTTPS tunnel that points only
+to the dashboard's webhook endpoint. Do not expose PostgreSQL, Redis, or the
+Docker control panel.
 
-The worker should use Railway internal database and Redis URLs.
-
-### 2. Generate secrets
-Create:
-- `NEXTAUTH_SECRET`
-- `CRON_SECRET`
-- `ENCRYPTION_KEY` using `openssl rand -hex 32`
-- `WEBHOOK_VERIFY_TOKEN`
-
-`ENCRYPTION_KEY` must be identical on the Vercel web app and Railway worker.
-
-Never commit secrets to GitHub.
-
-### 3. Vercel
-Import this fork into Vercel.
-
-Use:
-- Railway PUBLIC Postgres URL for `DATABASE_URL`
-- Railway PUBLIC Redis URL for `REDIS_URL`
-- the exact same `ENCRYPTION_KEY` used by the worker
-
-Deploy and keep the final `*.vercel.app` URL.
-
-### 4. Database
-Run the production migration once against the public PostgreSQL URL:
-
-```bash
-DATABASE_URL="postgresql://..." npm run db:migrate
-```
-
-### 5. Meta Developer App
+### 4. Meta Developer App
 Create a Business app using the use case:
 
 `Manage messaging and content on Instagram`
@@ -74,13 +46,13 @@ Add the Pour&Prompt Instagram account as an Instagram tester and accept the test
 Set the OAuth callback to:
 
 ```text
-https://<vercel-domain>/api/instagram/callback
+https://<public-https-url>/api/instagram/callback
 ```
 
 Set the webhook callback to:
 
 ```text
-https://<vercel-domain>/api/webhook
+https://<public-https-url>/api/webhook
 ```
 
 Subscribe to BOTH:
@@ -89,7 +61,7 @@ Subscribe to BOTH:
 
 Set privacy, terms, and data deletion URLs using the pages already shipped with OpenReply.
 
-### 6. Connect Pour&Prompt
+### 5. Connect Pour&Prompt
 Sign into OpenReply, then connect the Pour&Prompt Instagram account from Settings.
 
 ## First campaign

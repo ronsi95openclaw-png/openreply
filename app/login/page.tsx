@@ -1,4 +1,4 @@
-import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
+import { EMAIL_PROVIDER_ID, LOCAL_LOGIN_ENABLED, signIn } from "@/lib/auth";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 import { DemoNotice } from "@/components/demo-notice";
 
@@ -32,6 +32,14 @@ export default async function LoginPage({
     });
   }
 
+  async function signInLocally(formData: FormData) {
+    "use server";
+    await signIn("local-admin", {
+      password: String(formData.get("password") ?? ""),
+      redirectTo: callbackUrl,
+    });
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-md">
@@ -60,7 +68,32 @@ export default async function LoginPage({
             </div>
           )}
 
-          {checkEmail ? (
+          {LOCAL_LOGIN_ENABLED ? (
+            <form action={signInLocally} className="space-y-5">
+              <div className="space-y-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Dashboard password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 rounded bg-surface border border-border text-sm text-foreground focus:border-accent/40 focus:outline-none transition-colors"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full inline-flex items-center justify-center gap-2 rounded bg-accent px-6 py-3.5 text-sm font-semibold text-white shadow-indigo-500/25 transition-all hover:shadow-indigo-500/30"
+              >
+                Open dashboard
+              </button>
+            </form>
+          ) : checkEmail ? (
             <div className="text-center py-4">
               <h2 className="text-lg font-semibold mb-2">Check your email</h2>
               <p className="text-sm text-muted">

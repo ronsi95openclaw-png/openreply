@@ -42,6 +42,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isLocalRuntime = Boolean(
+    process.env.LOCAL_ADMIN_EMAIL && process.env.LOCAL_ADMIN_PASSWORD
+  );
+
   return (
     <html lang="en" className="h-full dark">
       <body
@@ -50,7 +54,7 @@ export default function RootLayout({
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {children}
-        <Analytics />
+        {!isLocalRuntime && <Analytics />}
       </body>
     </html>
   );

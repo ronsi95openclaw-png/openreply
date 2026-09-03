@@ -80,6 +80,19 @@ npm run dev               # web app on http://localhost:3000
 npm run worker            # in a second terminal, this sends the DMs
 ```
 
+For Pour&Prompt's PC-only setup, use the all-in-one local runtime instead:
+
+```bash
+cp .env.local.example .env.local
+# Fill in the local administrator email, password, and generated secrets.
+docker compose -f docker-compose.local.yml up --build -d
+```
+
+It starts the dashboard, worker, PostgreSQL, and Redis together and uses a
+local password login, so it does not require Resend, SMTP, Railway, or Vercel.
+See [the local PC guide](docs/local-pc.md) for the security boundary and first
+run steps.
+
 Two processes, always. `npm run dev` serves the app and receives webhooks. `npm run worker` is what actually sends the messages. If comments come in and no DM ever arrives, the worker is the first thing to check.
 
 Full environment variables and the production layout are in [docs/setup.md](docs/setup.md).
