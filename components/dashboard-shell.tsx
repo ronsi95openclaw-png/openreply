@@ -6,6 +6,7 @@ import TopBar from "@/components/top-bar";
 
 interface DashboardShellProps {
   children: React.ReactNode;
+  brandName: string;
   workspaceName: string;
   instagramUsername: string | null;
   instagramAccountCount: number;
@@ -13,6 +14,7 @@ interface DashboardShellProps {
 
 export default function DashboardShell({
   children,
+  brandName,
   workspaceName,
   instagramUsername,
   instagramAccountCount,
@@ -24,6 +26,7 @@ export default function DashboardShell({
     // would push the composer and pagination controls below the fold.
     <div className="flex h-dvh overflow-hidden bg-background">
       <Sidebar
+        brandName={brandName}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         workspaceName={workspaceName}
@@ -32,6 +35,7 @@ export default function DashboardShell({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar
           onMenuClick={() => setSidebarOpen(true)}
+          isSidebarOpen={sidebarOpen}
           instagramUsername={instagramUsername}
           instagramAccountCount={instagramAccountCount}
         />

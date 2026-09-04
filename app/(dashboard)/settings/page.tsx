@@ -289,6 +289,7 @@ export default function SettingsPage() {
             className="mt-6 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_140px_auto]"
           >
             <input
+              aria-label="Invitee email"
               type="email"
               value={inviteEmail}
               onChange={(event) => setInviteEmail(event.target.value)}
@@ -297,6 +298,7 @@ export default function SettingsPage() {
               required
             />
             <select
+              aria-label="Invitation role"
               value={inviteRole}
               onChange={(event) =>
                 setInviteRole(event.target.value as "ADMIN" | "MEMBER")

@@ -89,6 +89,7 @@ function Radio({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={checked}
       className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
         checked ? "border-accent bg-accent/5" : "border-border hover:border-border-hover"
       }`}
@@ -108,14 +109,19 @@ function Radio({
 function Toggle({
   on,
   onToggle,
+  label,
 }: {
   on: boolean;
   onToggle: () => void;
+  label: string;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
         on ? "bg-accent" : "bg-zinc-300"
       }`}
@@ -730,6 +736,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
             <Toggle
               on={dmTriggerEnabled}
               onToggle={() => setDmTriggerEnabled(!dmTriggerEnabled)}
+              label="Also reply to matching Instagram DMs"
             />
           </div>
           {dmTriggerEnabled && (
@@ -746,6 +753,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
             <Toggle
               on={publicReplyEnabled}
               onToggle={() => setPublicReplyEnabled(!publicReplyEnabled)}
+              label="Reply publicly to matching comments"
             />
           </div>
           {publicReplyEnabled && (
@@ -805,6 +813,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               <Toggle
                 on={openingDmEnabled}
                 onToggle={() => setOpeningDmEnabled(!openingDmEnabled)}
+                label="Send an opening DM"
               />
             </div>
             {openingDmEnabled && (
@@ -835,6 +844,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               <Toggle
                 on={requireFollow}
                 onToggle={() => setRequireFollow(!requireFollow)}
+                label="Require a follow before sending the link"
               />
             </div>
             {requireFollow && (
@@ -938,6 +948,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
               <Toggle
                 on={followUpEnabled}
                 onToggle={() => setFollowUpEnabled(!followUpEnabled)}
+                label="Send a follow-up thank-you message"
               />
             </div>
             {followUpEnabled && (

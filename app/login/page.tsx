@@ -3,7 +3,7 @@ import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 import { DemoNotice } from "@/components/demo-notice";
 
 export const metadata = {
-  title: "Login - OpenReply",
+  title: LOCAL_LOGIN_ENABLED ? "Sign in | Pour&Prompt" : "Login - OpenReply",
   description: "Sign in to manage Instagram comment-to-DM campaigns.",
 };
 
@@ -45,12 +45,14 @@ export default async function LoginPage({
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-foreground">
-            OpenReply
+            {LOCAL_LOGIN_ENABLED ? "Pour&Prompt" : "OpenReply"}
           </h1>
           <p className="text-muted text-sm leading-relaxed mt-2">
             {selectedTemplate
               ? `Sign in to use the ${selectedTemplate.title} template.`
-              : "Sign in by email, then connect your Instagram professional account."}
+              : LOCAL_LOGIN_ENABLED
+                ? "Sign in to manage Pour&Prompt's Instagram automations."
+                : "Sign in by email, then connect your Instagram professional account."}
           </p>
         </div>
 

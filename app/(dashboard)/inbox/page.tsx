@@ -37,6 +37,7 @@ function formatTime(iso: string | null): string {
 
 export default function InboxPage() {
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
   // Seed from the last-used account so a revisit can paint the cached
   // conversation list immediately, before the account list even loads.
   const [selectedAccountId, setSelectedAccountId] = useState(() => {
@@ -67,7 +68,11 @@ export default function InboxPage() {
     fetch("/api/instagram/accounts")
       .then((r) => r.json())
       .then((payload) => {
-        if (!payload.success) return;
+        if (!payload.success) {
+          setConvError(payload.error ?? "Failed to load Instagram accounts");
+          setConvLoading(false);
+          return;
+        }
         const next: AccountOption[] = payload.data.instagramAccounts ?? [];
         setAccounts(next);
         setSelectedAccountId((prev) => {
@@ -78,8 +83,18 @@ export default function InboxPage() {
             ? prev
             : payload.data.selectedInstagramAccountId || next[0]?.id || "";
         });
+        if (next.length === 0) {
+          setConversations([]);
+          setConvError(null);
+          setConvLoading(false);
+        }
       })
-      .catch(() => setAccounts([]));
+      .catch(() => {
+        setAccounts([]);
+        setConvError("Failed to load Instagram accounts");
+        setConvLoading(false);
+      })
+      .finally(() => setAccountsLoading(false));
   }, []);
 
   // Remember the chosen account for the next visit.
@@ -282,10 +297,26 @@ export default function InboxPage() {
             Conversations
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {convLoading ? (
-              <p className="px-4 py-6 text-sm text-muted">Loading…</p>
+            {accountsLoading || convLoading ? (
+              <p className="px-4 py-6 text-sm text-muted" role="status">
+                Loading conversations…
+              </p>
             ) : convError ? (
-              <p className="px-4 py-6 text-sm text-error">{convError}</p>
+              <p className="px-4 py-6 text-sm text-error" role="alert">
+                {convError}
+              </p>
+            ) : accounts.length === 0 ? (
+              <div className="px-4 py-6">
+                <p className="text-sm text-foreground">
+                  Connect Instagram to view conversations.
+                </p>
+                <a
+                  href="/api/instagram/connect"
+                  className="mt-3 inline-block text-sm font-medium text-accent hover:underline"
+                >
+                  Connect Instagram
+                </a>
+              </div>
             ) : conversations.length === 0 ? (
               <p className="px-4 py-6 text-sm text-muted">No conversations yet.</p>
             ) : (
@@ -384,6 +415,7 @@ export default function InboxPage() {
                 )}
                 <div className="flex items-end gap-2">
                   <textarea
+                    aria-label="Reply message"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={handleKeyDown}

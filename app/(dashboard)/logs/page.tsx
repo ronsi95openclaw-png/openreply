@@ -106,6 +106,7 @@ export default function LogsPage() {
             <button
               key={status}
               onClick={() => handleFilterChange(status)}
+              aria-pressed={statusFilter === status}
               className={`
                 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                 ${

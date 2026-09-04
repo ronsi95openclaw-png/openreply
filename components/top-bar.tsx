@@ -10,8 +10,11 @@ import { usePathname } from "next/navigation";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
+  "/overview": "Overview",
+  "/inbox": "Inbox",
   "/campaigns": "Campaigns",
   "/campaigns/new": "New Campaign",
+  "/campaigns/import": "Import Campaigns",
   "/automations": "Campaigns",
   "/automations/new": "New Campaign",
   "/logs": "DM Logs",
@@ -21,17 +24,25 @@ const pageTitles: Record<string, string> = {
 
 interface TopBarProps {
   onMenuClick: () => void;
+  isSidebarOpen: boolean;
   instagramUsername: string | null;
   instagramAccountCount: number;
 }
 
 export default function TopBar({
   onMenuClick,
+  isSidebarOpen,
   instagramUsername,
   instagramAccountCount,
 }: TopBarProps) {
   const pathname = usePathname();
-  const title = pageTitles[pathname] ?? "Dashboard";
+  const title =
+    pageTitles[pathname] ??
+    (pathname.startsWith("/campaigns/")
+      ? pathname.endsWith("/edit")
+        ? "Edit Campaign"
+        : "Campaign"
+      : "Dashboard");
 
   return (
     <header
@@ -49,6 +60,8 @@ export default function TopBar({
           onClick={onMenuClick}
           className="lg:hidden shrink-0 px-2.5 py-1.5 rounded border border-border text-sm text-muted hover:text-foreground"
           aria-label="Toggle sidebar"
+          aria-controls="dashboard-sidebar"
+          aria-expanded={isSidebarOpen}
         >
           Menu
         </button>

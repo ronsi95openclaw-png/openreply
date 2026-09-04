@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import DashboardShell from "@/components/dashboard-shell";
-import { auth } from "@/lib/auth";
+import { auth, LOCAL_LOGIN_ENABLED } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser } from "@/lib/workspace";
+
+const dashboardBrand = LOCAL_LOGIN_ENABLED ? "Pour&Prompt" : "OpenReply";
+
+export const metadata: Metadata = {
+  title: `${dashboardBrand} Dashboard`,
+};
 
 export default async function DashboardLayout({
   children,
@@ -27,6 +34,7 @@ export default async function DashboardLayout({
 
   return (
     <DashboardShell
+      brandName={dashboardBrand}
       workspaceName={workspace.name}
       instagramUsername={accounts[0]?.username ?? null}
       instagramAccountCount={accounts.length}
