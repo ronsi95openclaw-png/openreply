@@ -40,7 +40,20 @@ describe("local PC runtime", () => {
     ).toThrow();
   });
 
-  it("accepts a complete local runtime environment", () => {
+  it.each(["NEXTAUTH_SECRET", "CRON_SECRET", "WEBHOOK_VERIFY_TOKEN"])(
+    "rejects a short %s before a container starts",
+    (name) => {
+      expect(() =>
+        execFileSync(process.execPath, [validator], {
+          cwd: projectRoot,
+          env: localEnv({ [name]: "too-short" }),
+          stdio: "pipe",
+        })
+      ).toThrow();
+    }
+  );
+
+  it("accepts generated-length local secrets in a complete runtime environment", () => {
     expect(() =>
       execFileSync(process.execPath, [validator], {
         cwd: projectRoot,

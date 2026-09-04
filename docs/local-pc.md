@@ -29,6 +29,9 @@ hosted on Railway, Vercel, or another app platform.
 
 ## Before connecting Instagram
 
-Instagram requires a public HTTPS webhook URL. We will add one secure tunnel
-only after the local dashboard and worker are working. Do not expose Postgres,
-Redis, or the Docker control panel to the internet.
+Keep the current `NEXTAUTH_URL=http://localhost:3000` while this PC-only setup
+is local. At the later Meta connection stage, Instagram requires a public HTTPS
+origin for the webhook and OAuth login. Set `NEXTAUTH_URL` to that exact public
+origin, and configure the same origin's OAuth redirect URL in Meta before
+starting the connection. Do not expose Postgres, Redis, or the Docker control
+panel to the internet.

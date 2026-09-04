@@ -5,6 +5,17 @@ const placeholders = new Set([
   "choose-a-long-unique-password",
 ]);
 
+// The local setup guide generates these with crypto.randomBytes(32). Keep the
+// floor high enough that a short, memorable value cannot accidentally become a
+// production credential. This accepts either the documented 64-character hex
+// form or another securely generated representation of at least 32 characters.
+const MIN_SECRET_LENGTH = 32;
+const localSecretNames = [
+  "NEXTAUTH_SECRET",
+  "CRON_SECRET",
+  "WEBHOOK_VERIFY_TOKEN",
+];
+
 const required = [
   "NEXTAUTH_SECRET",
   "CRON_SECRET",
@@ -40,6 +51,17 @@ if (process.env.LOCAL_ADMIN_PASSWORD.length < 16) {
 
 if (!/^\S+@\S+\.\S+$/.test(process.env.LOCAL_ADMIN_EMAIL)) {
   console.error("[local setup] LOCAL_ADMIN_EMAIL must be a valid email address.");
+  process.exit(1);
+}
+
+const weakSecrets = localSecretNames.filter(
+  (name) => process.env[name].trim().length < MIN_SECRET_LENGTH
+);
+
+if (weakSecrets.length > 0) {
+  console.error(
+    `[local setup] ${weakSecrets.join(", ")} must each be at least ${MIN_SECRET_LENGTH} characters. Generate them with crypto.randomBytes(32).`
+  );
   process.exit(1);
 }
 
