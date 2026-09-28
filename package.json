@@ -11,6 +11,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "campaign:prepare-reel2": "tsx scripts/prepare-reel2-check.ts",
+    "campaign:prepare-reel3": "tsx scripts/prepare-reel3-shift.ts",
     "worker": "tsx worker/dm-worker.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
