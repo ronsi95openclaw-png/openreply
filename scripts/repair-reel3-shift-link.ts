@@ -5,7 +5,7 @@ async function main() {
   const result = await repairReel3ShiftLink({
     database: prisma as unknown as Reel3Database,
     requestedAccount: process.env.INSTAGRAM_ACCOUNT_ID,
-    origin: process.env.NEXTAUTH_URL,
+    origin: process.env.NEXTAUTH_URL ?? "",
   });
   console.log(JSON.stringify(result));
 }

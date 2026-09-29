@@ -7,7 +7,7 @@ async function main() {
   const result = await prepareReel3Shift({
     database: prisma as unknown as Reel3Database,
     requestedAccount: process.env.INSTAGRAM_ACCOUNT_ID,
-    origin: process.env.NEXTAUTH_URL,
+    origin: process.env.NEXTAUTH_URL ?? "",
     generateReportShareSlug,
     generateTrackedLinkSlug,
   });

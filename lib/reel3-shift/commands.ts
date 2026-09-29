@@ -71,7 +71,7 @@ function exactAccountWhere(account: Reel3Account) {
   };
 }
 
-function safelyStagedCampaignWhere(account: Reel3Account) {
+function knownStagedCampaignWhere(account: Reel3Account) {
   return {
     id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID,
     workspaceId: account.workspaceId,
@@ -92,7 +92,7 @@ function safelyStagedCampaignWhere(account: Reel3Account) {
   };
 }
 
-function canonicalTrackedLinkWhere(account: Reel3Account, destinationUrl: string) {
+function knownTrackedLinkWhere(account: Reel3Account, destinationUrl: string) {
   return {
     slug: KNOWN_STAGED_SHIFT_LINK_SLUG,
     destinationUrl,
@@ -100,9 +100,42 @@ function canonicalTrackedLinkWhere(account: Reel3Account, destinationUrl: string
   };
 }
 
-function oneCanonicalTrackedLinkWhere(account: Reel3Account, destinationUrl: string) {
-  const link = canonicalTrackedLinkWhere(account, destinationUrl);
-  return { some: link, every: link };
+function currentSafelyStagedCampaignWhere(account: Reel3Account, campaign: ShiftCampaign) {
+  return {
+    id: campaign.id,
+    workspaceId: account.workspaceId,
+    instagramAccountId: account.id,
+    instagramAccount: { is: exactAccountWhere(account) },
+    name: SHIFT_CAMPAIGN_NAME,
+    keywords: { equals: [SHIFT_KEYWORD] },
+    isActive: false,
+    pendingNextReel: false,
+    postId: null,
+    postUrl: null,
+    matchAnyPost: false,
+    matchAnyWord: false,
+    wholeWordMatch: true,
+    publicReplyEnabled: true,
+    dmTriggerEnabled: false,
+    linkButtonLabel: SHIFT_BUTTON_LABEL,
+  };
+}
+
+function oneCurrentCanonicalTrackedLinkWhere(
+  account: Reel3Account,
+  link: ShiftCampaign["trackedLinks"][number],
+  destinationUrl: string
+) {
+  const currentLink = {
+    id: link.id,
+    slug: link.slug,
+    workspaceId: account.workspaceId,
+    destinationUrl,
+  };
+  return {
+    some: currentLink,
+    every: currentLink,
+  };
 }
 
 export async function prepareReel3Shift({
@@ -188,13 +221,13 @@ export async function repairReel3ShiftLink({
       const result = await database.trackedLink.updateMany({
         where: {
           id: link.id,
-          ...canonicalTrackedLinkWhere(account, legacyDestination),
+          ...knownTrackedLinkWhere(account, legacyDestination),
           automation: {
             is: {
-              ...safelyStagedCampaignWhere(account),
+              ...knownStagedCampaignWhere(account),
               trackedLinks: {
-                some: { id: link.id, ...canonicalTrackedLinkWhere(account, legacyDestination) },
-                every: { id: link.id, ...canonicalTrackedLinkWhere(account, legacyDestination) },
+                some: { id: link.id, ...knownTrackedLinkWhere(account, legacyDestination) },
+                every: { id: link.id, ...knownTrackedLinkWhere(account, legacyDestination) },
               },
             },
           },
@@ -226,11 +259,15 @@ export async function bindReel3ShiftCampaign({
     canonicalDestination,
     expectedPostUrl,
     recentReels: () => recentReels(account),
-    activate: async (campaign, reelId, reelUrl) => {
+    activate: async (campaign, link, reelId, reelUrl) => {
       const result = await database.automation.updateMany({
         where: {
-          ...safelyStagedCampaignWhere(account),
-          trackedLinks: oneCanonicalTrackedLinkWhere(account, canonicalDestination),
+          ...currentSafelyStagedCampaignWhere(account, campaign),
+          trackedLinks: oneCurrentCanonicalTrackedLinkWhere(
+            account,
+            link,
+            canonicalDestination
+          ),
         },
         data: { postId: reelId, postUrl: reelUrl, pendingNextReel: false, isActive: true },
       });

@@ -11,6 +11,9 @@ links: [landing-page, delivery]
 - [x] Make the staged SHIFT commands refuse stale or wrong-account writes {#campaigns-reel3-atomic-safety}
   by: codex
   from: agent
+- [x] Bind a recreated SHIFT campaign only when its verified configuration still matches {#campaigns-reel3-recreated-bind}
+  by: codex
+  from: agent
 
 ## Keep Instagram accounts protected {#accounts}
 tech: Connected-account selection and Meta permalink verification.
@@ -59,4 +62,5 @@ needs: [campaigns, landing-page]
 - 2026-09-28: Repairing the existing staged SHIFT link must be a deliberately guarded, idempotent command; it is not run as part of this code-only change.
 - 2026-09-28: SHIFT repair and binding must make one conditional database write that repeats every checked campaign, tracked-link, and connected-account precondition; a stale snapshot must refuse rather than mutate a changed record.
 - 2026-09-28: BRAND is protected and currently has legacy `matchAnyPost: true`; this task must not change it. CHECK remains isolated and unchanged.
+- 2026-09-28: The one-time staged-link repair stays fixed to the original campaign and link identifiers, while exact binding must use the sole currently verified prepared SHIFT campaign and link so an intentionally recreated valid configuration can proceed safely.
 - 2026-09-28: Final Reel 3 asset, caption, profile-grid-safe cover, and audio approval remain owner gates. No Reel video is created in this implementation.

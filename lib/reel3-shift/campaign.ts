@@ -213,10 +213,19 @@ export async function bindStagedShiftCampaign({
   canonicalDestination: string;
   expectedPostUrl: string;
   recentReels: () => Promise<RecentReel[]>;
-  activate: (campaign: ShiftCampaign, reelId: string, reelUrl: string) => Promise<number>;
+  activate: (
+    campaign: ShiftCampaign,
+    link: ShiftTrackedLink,
+    reelId: string,
+    reelUrl: string
+  ) => Promise<number>;
 }): Promise<{ campaignId: string; postId: string; postUrl: string }> {
   const campaign = requireSoleShiftCampaign(campaigns);
-  assertShiftCampaignConfiguration({ campaign, accountId, allowedDestinations: [canonicalDestination] });
+  const link = assertShiftCampaignConfiguration({
+    campaign,
+    accountId,
+    allowedDestinations: [canonicalDestination],
+  });
 
   const reels = await recentReels();
   const reel = reels.find(
@@ -231,7 +240,7 @@ export async function bindStagedShiftCampaign({
     );
   }
 
-  const changed = await activate(campaign, reel.id, expectedPostUrl);
+  const changed = await activate(campaign, link, reel.id, expectedPostUrl);
   if (changed !== 1) {
     throw new Error("SHIFT campaign changed before the Reel could be bound. No changes were made.");
   }

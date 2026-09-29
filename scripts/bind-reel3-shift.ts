@@ -8,7 +8,7 @@ async function main() {
   const result = await bindReel3ShiftCampaign({
     database: prisma as unknown as Reel3Database,
     requestedAccount: process.env.INSTAGRAM_ACCOUNT_ID,
-    origin: process.env.NEXTAUTH_URL,
+    origin: process.env.NEXTAUTH_URL ?? "",
     expectedPostUrl: canonicalReelUrl(process.env.REEL3_POST_URL ?? ""),
     recentReels: (account) => getUserMedia(decryptToken(account.accessToken), 25),
   });

@@ -5,9 +5,11 @@ describe("Instagram webhook subscription", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("subscribes to button postbacks and read receipts as well as comments and messages", async () => {
-    const fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ success: true }), { status: 200 })
-    );
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
     vi.stubGlobal("fetch", fetch);
 
     await expect(

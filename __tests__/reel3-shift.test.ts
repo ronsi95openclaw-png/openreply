@@ -219,7 +219,12 @@ describe("Reel 3 exact binding", () => {
         activate,
       })
     ).resolves.toEqual({ campaignId: "shift-campaign", postId: "reel-three-id", postUrl: "https://www.instagram.com/reel/reel-three/" });
-    expect(activate).toHaveBeenCalledWith(expect.objectContaining({ id: "shift-campaign" }), "reel-three-id", "https://www.instagram.com/reel/reel-three/");
+    expect(activate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "shift-campaign" }),
+      expect.objectContaining({ id: "tracked-link", destinationUrl: canonicalDestination }),
+      "reel-three-id",
+      "https://www.instagram.com/reel/reel-three/"
+    );
   });
 });
 
@@ -305,9 +310,71 @@ describe("Reel 3 command database guards", () => {
     );
   });
 
-  it("refuses a stale conditional bind after the Meta lookup", async () => {
+  it("binds a valid replacement campaign created by preparation", async () => {
+    const replacement = stagedCampaign({
+      id: "recreated-shift-campaign",
+      trackedLinks: [
+        { id: "recreated-tracked-link", slug: "recreated-link", destinationUrl: canonicalDestination },
+      ],
+    });
+    const database = mockedDatabase();
+    let persistedCampaigns: ShiftCampaign[] = [];
+    const findMany = database.automation.findMany as unknown as ReturnType<typeof vi.fn>;
+    const create = database.automation.create as unknown as ReturnType<typeof vi.fn>;
+    findMany.mockImplementation(async () => persistedCampaigns);
+    create.mockImplementation(async () => {
+      persistedCampaigns = [replacement];
+      return replacement;
+    });
+
+    await expect(
+      prepareReel3Shift({
+        database,
+        requestedAccount: "1784",
+        origin,
+        generateReportShareSlug: () => "replacement-report-share",
+        generateTrackedLinkSlug: () => "recreated-link",
+      })
+    ).resolves.toMatchObject({ status: "staged", campaignId: "recreated-shift-campaign" });
+
+    await expect(
+      bindReel3ShiftCampaign({
+        database,
+        requestedAccount: "1784",
+        origin,
+        expectedPostUrl: "https://www.instagram.com/reel/reel-three/",
+        recentReels: async () => [
+          { id: "reel-three-id", media_product_type: "REELS", permalink: "https://www.instagram.com/reel/reel-three/" },
+        ],
+      })
+    ).resolves.toEqual({
+      campaignId: "recreated-shift-campaign",
+      postId: "reel-three-id",
+      postUrl: "https://www.instagram.com/reel/reel-three/",
+    });
+    expect(database.automation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "recreated-shift-campaign",
+          trackedLinks: expect.objectContaining({
+            some: expect.objectContaining({ id: "recreated-tracked-link", slug: "recreated-link" }),
+            every: expect.objectContaining({ id: "recreated-tracked-link", slug: "recreated-link" }),
+          }),
+        }),
+      })
+    );
+  });
+
+  it("refuses a changed replacement configuration during the conditional bind write", async () => {
     const database = mockedDatabase({
-      campaigns: [stagedCampaign({ id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID })],
+      campaigns: [
+        stagedCampaign({
+          id: "recreated-shift-campaign",
+          trackedLinks: [
+            { id: "recreated-tracked-link", slug: "recreated-link", destinationUrl: canonicalDestination },
+          ],
+        }),
+      ],
       bind: { count: 0 },
     });
     const recentReels = vi.fn(async () => [
@@ -326,9 +393,12 @@ describe("Reel 3 command database guards", () => {
     expect(database.automation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID,
+          id: "recreated-shift-campaign",
           instagramAccount: expect.any(Object),
-          trackedLinks: expect.any(Object),
+          trackedLinks: expect.objectContaining({
+            some: expect.objectContaining({ id: "recreated-tracked-link", slug: "recreated-link" }),
+            every: expect.objectContaining({ id: "recreated-tracked-link", slug: "recreated-link" }),
+          }),
         }),
       })
     );
