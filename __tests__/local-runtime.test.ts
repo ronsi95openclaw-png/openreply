@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { getSessionUserId } from "@/lib/auth/session";
 
 const projectRoot = path.resolve(__dirname, "..");
 const validator = path.join(projectRoot, "scripts/validate-local-env.mjs");
+const composeFile = path.join(projectRoot, "docker-compose.local.yml");
 
 function localEnv(
   overrides: Record<string, string | undefined> = {}
@@ -24,6 +26,15 @@ function localEnv(
 }
 
 describe("local PC runtime", () => {
+  it("keeps the normal local port private while allowing the deployed bind and admin settings", () => {
+    const compose = readFileSync(composeFile, "utf8");
+
+    expect(compose).toContain("- .env.local-admin");
+    expect(compose).toContain(
+      '"${OPENREPLY_BIND_ADDRESS:-127.0.0.1}:${OPENREPLY_HOST_PORT:-3000}:3000"'
+    );
+  });
+
   it("keeps a JWT-session user id when the database user is absent", () => {
     expect(getSessionUserId(undefined, "jwt-user")).toBe("jwt-user");
     expect(getSessionUserId("database-user", "jwt-user")).toBe("database-user");

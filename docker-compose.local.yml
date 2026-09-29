@@ -40,11 +40,13 @@ services:
 
   dashboard:
     build: .
-    env_file: .env.local
+    env_file:
+      - .env.local
+      - .env.local-admin
     command: ["sh", "-c", "node scripts/validate-local-env.mjs && npm run start"]
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${OPENREPLY_BIND_ADDRESS:-127.0.0.1}:${OPENREPLY_HOST_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,44 +1,17 @@
 import { prisma } from "../lib/db/client";
-import {
-  bindStagedShiftCampaign,
-  canonicalReelUrl,
-  publicOrigin,
-  selectExactInstagramAccount,
-  SHIFT_CAMPAIGN_NAME,
-  SHIFT_KEYWORD,
-} from "../lib/reel3-shift/campaign";
+import { bindReel3ShiftCampaign, type Reel3Database } from "../lib/reel3-shift/commands";
+import { canonicalReelUrl } from "../lib/reel3-shift/campaign";
 import { getUserMedia } from "../lib/meta/client";
 import { decryptToken } from "../lib/meta/oauth";
 
-type Reel3Account = { id: string; instagramId: string; accessToken: string };
-
 async function main() {
-  const expectedPostUrl = canonicalReelUrl(process.env.REEL3_POST_URL ?? "");
-  const accounts = await prisma.instagramAccount.findMany({ orderBy: { connectedAt: "desc" } });
-  const account = selectExactInstagramAccount(
-    accounts as Reel3Account[],
-    process.env.INSTAGRAM_ACCOUNT_ID
-  );
-  const result = await bindStagedShiftCampaign({
-    campaigns: await prisma.automation.findMany({
-      where: {
-        instagramAccountId: account.id,
-        OR: [{ name: SHIFT_CAMPAIGN_NAME }, { keywords: { has: SHIFT_KEYWORD } }],
-      },
-      include: { trackedLinks: { orderBy: { createdAt: "asc" } } },
-    }),
-    accountId: account.id,
-    canonicalDestination: `${publicOrigin(process.env.NEXTAUTH_URL)}/shift-handoff`,
-    expectedPostUrl,
-    recentReels: () => getUserMedia(decryptToken(account.accessToken), 25),
-    activate: async (campaignId, reelId, reelUrl) => {
-      await prisma.automation.update({
-        where: { id: campaignId },
-        data: { postId: reelId, postUrl: reelUrl, pendingNextReel: false, isActive: true },
-      });
-    },
+  const result = await bindReel3ShiftCampaign({
+    database: prisma as unknown as Reel3Database,
+    requestedAccount: process.env.INSTAGRAM_ACCOUNT_ID,
+    origin: process.env.NEXTAUTH_URL,
+    expectedPostUrl: canonicalReelUrl(process.env.REEL3_POST_URL ?? ""),
+    recentReels: (account) => getUserMedia(decryptToken(account.accessToken), 25),
   });
-
   console.log(JSON.stringify({ status: "bound", ...result, active: true }));
 }
 

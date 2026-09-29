@@ -28,9 +28,12 @@ export type ShiftCampaign = {
   trackedLinks: ShiftTrackedLink[];
 };
 
-export type InstagramAccountIdentity = {
+export type Reel3Account = {
   id: string;
   instagramId: string;
+  username: string;
+  workspaceId: string;
+  accessToken: string;
 };
 
 export type RecentReel = {
@@ -74,7 +77,7 @@ export function canonicalReelUrl(raw: string): string {
   return `https://www.instagram.com/reel/${slug}/`;
 }
 
-export function selectExactInstagramAccount<T extends InstagramAccountIdentity>(
+export function selectExactInstagramAccount<T extends Reel3Account>(
   accounts: T[],
   requested: string | undefined
 ): T {
@@ -88,6 +91,10 @@ export function selectExactInstagramAccount<T extends InstagramAccountIdentity>(
   );
   if (matches.length !== 1) {
     throw new Error("INSTAGRAM_ACCOUNT_ID must match exactly one connected Instagram account.");
+  }
+
+  if (matches[0].username !== "pourandprompt") {
+    throw new Error("INSTAGRAM_ACCOUNT_ID must select the connected @pourandprompt account.");
   }
 
   return matches[0];
@@ -168,7 +175,7 @@ export async function repairStagedShiftLink({
   accountId: string;
   legacyDestination: string;
   canonicalDestination: string;
-  updateDestination: (linkId: string, destinationUrl: string) => Promise<void>;
+  updateDestination: (campaign: ShiftCampaign, link: ShiftTrackedLink) => Promise<number>;
 }): Promise<{ status: "repaired" | "already_correct"; campaignId: string; destinationUrl: string }> {
   const campaign = requireSoleShiftCampaign(campaigns);
   const link = assertShiftCampaignConfiguration({
@@ -186,7 +193,10 @@ export async function repairStagedShiftLink({
     throw new Error("SHIFT campaign tracked link destination changed. No changes were made.");
   }
 
-  await updateDestination(link.id, canonicalDestination);
+  const changed = await updateDestination(campaign, link);
+  if (changed !== 1) {
+    throw new Error("SHIFT campaign changed before the link repair could be applied. No changes were made.");
+  }
   return { status: "repaired", campaignId: campaign.id, destinationUrl: canonicalDestination };
 }
 
@@ -203,7 +213,7 @@ export async function bindStagedShiftCampaign({
   canonicalDestination: string;
   expectedPostUrl: string;
   recentReels: () => Promise<RecentReel[]>;
-  activate: (campaignId: string, reelId: string, reelUrl: string) => Promise<void>;
+  activate: (campaign: ShiftCampaign, reelId: string, reelUrl: string) => Promise<number>;
 }): Promise<{ campaignId: string; postId: string; postUrl: string }> {
   const campaign = requireSoleShiftCampaign(campaigns);
   assertShiftCampaignConfiguration({ campaign, accountId, allowedDestinations: [canonicalDestination] });
@@ -221,6 +231,9 @@ export async function bindStagedShiftCampaign({
     );
   }
 
-  await activate(campaign.id, reel.id, expectedPostUrl);
+  const changed = await activate(campaign, reel.id, expectedPostUrl);
+  if (changed !== 1) {
+    throw new Error("SHIFT campaign changed before the Reel could be bound. No changes were made.");
+  }
   return { campaignId: campaign.id, postId: reel.id, postUrl: expectedPostUrl };
 }

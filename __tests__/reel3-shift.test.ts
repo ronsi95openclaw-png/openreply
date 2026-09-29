@@ -2,10 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertShiftCampaignConfiguration,
   bindStagedShiftCampaign,
+  KNOWN_STAGED_SHIFT_CAMPAIGN_ID,
   repairStagedShiftLink,
   selectExactInstagramAccount,
   type ShiftCampaign,
 } from "../lib/reel3-shift/campaign";
+import {
+  bindReel3ShiftCampaign,
+  prepareReel3Shift,
+  repairReel3ShiftLink,
+  type Reel3Database,
+} from "../lib/reel3-shift/commands";
 
 const origin = "https://pourandprompt.example";
 const canonicalDestination = `${origin}/shift-handoff`;
@@ -30,6 +37,30 @@ function stagedCampaign(overrides: Partial<ShiftCampaign> = {}): ShiftCampaign {
     trackedLinks: [{ id: "tracked-link", slug: "VwV7X0fsTg", destinationUrl: canonicalDestination }],
     ...overrides,
   };
+}
+
+const selectedAccount = {
+  id: "pour-and-prompt",
+  instagramId: "1784",
+  username: "pourandprompt",
+  workspaceId: "workspace-1",
+  accessToken: "encrypted-token",
+};
+
+function mockedDatabase(overrides: Partial<Record<"accounts" | "campaigns" | "create" | "repair" | "bind", unknown>> = {}) {
+  return {
+    instagramAccount: {
+      findMany: vi.fn().mockResolvedValue(overrides.accounts ?? [selectedAccount]),
+    },
+    automation: {
+      findMany: vi.fn().mockResolvedValue(overrides.campaigns ?? []),
+      create: vi.fn().mockResolvedValue(overrides.create ?? stagedCampaign({ id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID })),
+      updateMany: vi.fn().mockResolvedValue(overrides.bind ?? { count: 1 }),
+    },
+    trackedLink: {
+      updateMany: vi.fn().mockResolvedValue(overrides.repair ?? { count: 1 }),
+    },
+  } as unknown as Reel3Database;
 }
 
 describe("Reel 3 SHIFT campaign guards", () => {
@@ -65,18 +96,19 @@ describe("Reel 3 SHIFT campaign guards", () => {
 
   it("requires an explicit account selector that resolves exactly once", () => {
     const accounts = [
-      { id: "pour-and-prompt", instagramId: "1784" },
-      { id: "other", instagramId: "1785" },
+      selectedAccount,
+      { id: "other", instagramId: "1785", username: "other", workspaceId: "workspace-2", accessToken: "encrypted-token" },
     ];
     expect(selectExactInstagramAccount(accounts, "1784").id).toBe("pour-and-prompt");
     expect(() => selectExactInstagramAccount(accounts, undefined)).toThrow("INSTAGRAM_ACCOUNT_ID is required");
     expect(() => selectExactInstagramAccount(accounts, "missing")).toThrow("exactly one");
+    expect(() => selectExactInstagramAccount([{ ...selectedAccount, username: "not-pourandprompt" }], "1784")).toThrow("@pourandprompt");
   });
 });
 
 describe("Reel 3 staged-link repair", () => {
   it("repairs only the known legacy destination and is idempotent after repair", async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn(async () => 1);
     const legacyCampaign = stagedCampaign({
       id: "cmucup4v800006mnyn3rt5kzw",
       trackedLinks: [{ id: "tracked-link", slug: "VwV7X0fsTg", destinationUrl: legacyDestination }],
@@ -92,7 +124,7 @@ describe("Reel 3 staged-link repair", () => {
       })
     ).resolves.toEqual({ status: "repaired", campaignId: "cmucup4v800006mnyn3rt5kzw", destinationUrl: canonicalDestination });
     expect(write).toHaveBeenCalledOnce();
-    expect(write).toHaveBeenCalledWith("tracked-link", canonicalDestination);
+    expect(write).toHaveBeenCalledWith(legacyCampaign, legacyCampaign.trackedLinks[0]);
 
     await expect(
       repairStagedShiftLink({
@@ -107,7 +139,7 @@ describe("Reel 3 staged-link repair", () => {
   });
 
   it("refuses changed destinations, unsafe state, and more than one SHIFT candidate without writing", async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn(async () => 1);
     await expect(
       repairStagedShiftLink({
         campaigns: [stagedCampaign({ id: "cmucup4v800006mnyn3rt5kzw", trackedLinks: [{ id: "tracked-link", slug: "VwV7X0fsTg", destinationUrl: `${origin}/other` }] })],
@@ -156,7 +188,7 @@ describe("Reel 3 staged-link repair", () => {
 describe("Reel 3 exact binding", () => {
   it("refuses unsafe SHIFT state before looking up Instagram media or activating the campaign", async () => {
     const recentReels = vi.fn(async () => []);
-    const activate = vi.fn(async () => undefined);
+    const activate = vi.fn(async () => 1);
 
     await expect(
       bindStagedShiftCampaign({
@@ -173,7 +205,7 @@ describe("Reel 3 exact binding", () => {
   });
 
   it("activates only after the exact public permalink is found", async () => {
-    const activate = vi.fn(async () => undefined);
+    const activate = vi.fn(async () => 1);
     await expect(
       bindStagedShiftCampaign({
         campaigns: [stagedCampaign()],
@@ -187,6 +219,118 @@ describe("Reel 3 exact binding", () => {
         activate,
       })
     ).resolves.toEqual({ campaignId: "shift-campaign", postId: "reel-three-id", postUrl: "https://www.instagram.com/reel/reel-three/" });
-    expect(activate).toHaveBeenCalledWith("shift-campaign", "reel-three-id", "https://www.instagram.com/reel/reel-three/");
+    expect(activate).toHaveBeenCalledWith(expect.objectContaining({ id: "shift-campaign" }), "reel-three-id", "https://www.instagram.com/reel/reel-three/");
+  });
+});
+
+describe("Reel 3 command database guards", () => {
+  it("prepares once, then makes no second database write", async () => {
+    const database = mockedDatabase();
+    await expect(
+      prepareReel3Shift({
+        database,
+        requestedAccount: "1784",
+        origin,
+        generateReportShareSlug: () => "report-share",
+        generateTrackedLinkSlug: () => "link-share",
+      })
+    ).resolves.toMatchObject({ status: "staged" });
+
+    (database.automation.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      stagedCampaign({ id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID }),
+    ]);
+    await expect(
+      prepareReel3Shift({
+        database,
+        requestedAccount: "1784",
+        origin,
+        generateReportShareSlug: () => "another-report-share",
+        generateTrackedLinkSlug: () => "another-link-share",
+      })
+    ).resolves.toMatchObject({ status: "already_staged" });
+    expect(database.automation.create).toHaveBeenCalledOnce();
+  });
+
+  it("does not write when the requested account is not @pourandprompt or candidates are duplicated", async () => {
+    const wrongAccount = mockedDatabase({
+      accounts: [{ ...selectedAccount, username: "another-account" }],
+    });
+    await expect(
+      prepareReel3Shift({
+        database: wrongAccount,
+        requestedAccount: "1784",
+        origin,
+        generateReportShareSlug: () => "report-share",
+        generateTrackedLinkSlug: () => "link-share",
+      })
+    ).rejects.toThrow("@pourandprompt");
+    expect(wrongAccount.automation.create).not.toHaveBeenCalled();
+
+    const duplicates = mockedDatabase({
+      campaigns: [stagedCampaign(), stagedCampaign({ id: "duplicate" })],
+    });
+    await expect(
+      prepareReel3Shift({
+        database: duplicates,
+        requestedAccount: "1784",
+        origin,
+        generateReportShareSlug: () => "report-share",
+        generateTrackedLinkSlug: () => "link-share",
+      })
+    ).rejects.toThrow("exactly one");
+    expect(duplicates.automation.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale conditional repair write", async () => {
+    const database = mockedDatabase({
+      campaigns: [
+        stagedCampaign({
+          id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID,
+          trackedLinks: [{ id: "tracked-link", slug: "VwV7X0fsTg", destinationUrl: legacyDestination }],
+        }),
+      ],
+      repair: { count: 0 },
+    });
+    await expect(
+      repairReel3ShiftLink({ database, requestedAccount: "1784", origin })
+    ).rejects.toThrow("changed before the link repair");
+    expect(database.trackedLink.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          slug: "VwV7X0fsTg",
+          destinationUrl: legacyDestination,
+          automation: expect.any(Object),
+        }),
+      })
+    );
+  });
+
+  it("refuses a stale conditional bind after the Meta lookup", async () => {
+    const database = mockedDatabase({
+      campaigns: [stagedCampaign({ id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID })],
+      bind: { count: 0 },
+    });
+    const recentReels = vi.fn(async () => [
+      { id: "reel-three-id", media_product_type: "REELS", permalink: "https://www.instagram.com/reel/reel-three/" },
+    ]);
+    await expect(
+      bindReel3ShiftCampaign({
+        database,
+        requestedAccount: "1784",
+        origin,
+        expectedPostUrl: "https://www.instagram.com/reel/reel-three/",
+        recentReels,
+      })
+    ).rejects.toThrow("changed before the Reel could be bound");
+    expect(recentReels).toHaveBeenCalledOnce();
+    expect(database.automation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: KNOWN_STAGED_SHIFT_CAMPAIGN_ID,
+          instagramAccount: expect.any(Object),
+          trackedLinks: expect.any(Object),
+        }),
+      })
+    );
   });
 });
