@@ -38,10 +38,10 @@ Compose, the database, or either credential file during code review.
 
 The running Compose project is named `openreply` and owns the existing named volumes
 `openreply_pgdata` and `openreply_redisdata`. Its current Scheduled Task, `OpenReply WSL Runtime`,
-runs `scripts/start-openreply-wsl.ps1` from the dirty deployment checkout
-`C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy`. That script resolves its own
-directory, then starts the explicitly named `dashboard`, `worker`, and `cron` services with
-`--no-deps` inside WSL. The reviewed clean checkout is
+runs from the dirty deployment checkout
+`C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy`. The task also keeps Ubuntu/WSL
+available after sign-in. Its legacy launcher uses plain `docker compose up -d`, which can start
+`migrate`; do not treat that task or launcher as migration-safe. The reviewed clean checkout is
 `C:\Users\maste\.codex\worktrees\reel3-shift-canonical\openreply`.
 
 The clean checkout needs references to the existing untracked credential files because the Compose
@@ -93,6 +93,19 @@ approved migration and a second clean `migrate status`, return to this runbook. 
 database is current, obtain the owner’s approval for the no-migration cutover below. No status
 result authorizes a migration implicitly.
 
+### Retire the unsafe Scheduled Task first
+
+With owner approval, stop and disable the current `OpenReply WSL Runtime` task *before* starting
+any candidate app service. This prevents its old plain-Compose action from racing the manual
+no-migration procedure. Disabling it also temporarily removes its automatic Ubuntu/WSL keep-alive
+after sign-in; the reviewed clean task below resumes that role only after the cutover passes its
+smoke checks. Do not leave the old task enabled as a fallback.
+
+```powershell
+Stop-ScheduledTask -TaskName 'OpenReply WSL Runtime'
+Disable-ScheduledTask -TaskName 'OpenReply WSL Runtime'
+```
+
 ### Owner-approved no-migration cutover
 
 Start only the three app services with the existing project name. `--no-deps` is intentional: it
@@ -108,40 +121,47 @@ wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical
 
 Smoke-check the dashboard, worker, scheduler, database, Redis, public HTTPS health endpoint, and
 `${NEXTAUTH_URL}/shift-handoff`. Do not invoke a tracked redirect, webhook, campaign command, or
-Instagram interaction as a smoke check. Only after those checks succeed, repoint the Scheduled Task
-to the clean checkout's reviewed `scripts/start-openreply-wsl.ps1` and start it. Preserve the
-task's existing trigger, principal, and settings; change only its action.
+Instagram interaction as a smoke check. Only after those checks succeed, repoint the disabled
+Scheduled Task to the clean checkout's reviewed `scripts/start-openreply-wsl.ps1`, enable it, and
+start it. This restores the after-sign-in Ubuntu/WSL keep-alive role with the reviewed safe
+launcher. Preserve the task's existing trigger, principal, and settings; change only its action and
+enabled state.
 
 ```powershell
 $candidate = 'C:\Users\maste\.codex\worktrees\reel3-shift-canonical\openreply'
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
   -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$candidate\scripts\start-openreply-wsl.ps1`"" `
   -WorkingDirectory $candidate
-Stop-ScheduledTask -TaskName 'OpenReply WSL Runtime'
 Set-ScheduledTask -TaskName 'OpenReply WSL Runtime' -Action $action
+Enable-ScheduledTask -TaskName 'OpenReply WSL Runtime'
 Start-ScheduledTask -TaskName 'OpenReply WSL Runtime'
 ```
 
-If any smoke check fails before the Scheduled Task is changed, leave the task action alone. If the
-task has already been changed to the clean checkout, stop it. Do **not** repoint `OpenReply WSL
-Runtime` at the old checkout or start it: its existing launcher uses plain `docker compose up -d`,
-which may invoke `migrate`.
+If any smoke check fails, leave `OpenReply WSL Runtime` stopped and disabled. If its action has
+already been changed to the clean checkout, stop and disable it again. Do **not** re-enable or
+repoint it at the old checkout: that legacy launcher uses plain `docker compose up -d`, which may
+invoke `migrate`.
 
 A rollback is manual until the old checkout has its own separately reviewed migration-safe launcher.
-First reconfirm the existing database and Redis are healthy and the schema is current. Then, with
+First stop and disable `OpenReply WSL Runtime` if the clean task had been enabled, then reconfirm
+the existing database and Redis are healthy and the schema is current. Do not repoint or start the
+task during rollback; this keeps its unsafe old action from taking over the recovery. Then, with
 owner approval, start only the old app services through this explicit no-dependency command:
 
 ```powershell
 $rollback = 'C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy'
+Stop-ScheduledTask -TaskName 'OpenReply WSL Runtime'
+Disable-ScheduledTask -TaskName 'OpenReply WSL Runtime'
 wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/OneDrive/Documents/ChatGPT/openreply-reel2-deploy -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml up -d --build --no-deps dashboard worker cron'
 ```
 
 Recheck health before considering the rollback complete. This command preserves the same volumes and
 cannot start the Compose `migrate` service, but it does not restore automatic restart after sign-in.
-Keep `OpenReply WSL Runtime` stopped and pointed away from the old checkout until a reviewed
-migration-safe rollback launcher is available and the owner approves its use. Do not delete the
-clean links, the old checkout, either named volume, or either credential file until the owner has
-accepted the clean runtime.
+Keep `OpenReply WSL Runtime` stopped and disabled throughout rollback; the only recovery path in
+this runbook is the manual `--no-deps` command above. A migration requires separate, exact owner
+approval and is not part of rollback; that approval does not permit restarting the old task. Do not
+delete the clean links, the old checkout, either named volume, or either credential file until the
+owner has accepted the clean runtime.
 
 ## Repair the existing staged link — only after deployment approval
 

@@ -67,6 +67,9 @@ needs: [campaigns, landing-page]
 - [x] Keep rollback manual until its old task has a reviewed safe launcher {#runbook-safe-rollback-task}
   by: codex
   from: agent
+- [x] Stop the old task before switching services and keep it stopped through rollback {#runbook-stop-unsafe-task}
+  by: codex
+  from: agent
 
 ## decisions
 
@@ -78,3 +81,4 @@ needs: [campaigns, landing-page]
 - 2026-09-28: Final Reel 3 asset, caption, profile-grid-safe cover, and audio approval remain owner gates. No Reel video is created in this implementation.
 - 2026-09-28: A clean-runtime cutover or rollback must never use normal Compose dependency startup: dashboard and worker depend on `migrate`, so only an owner-approved schema-state check followed by `up --no-deps` for the explicit app services can keep migration execution separate.
 - 2026-09-28: The old deployment checkout's task launcher is not treated as migration-safe. Until it has its own reviewed launcher, a rollback may restart app services through the explicit no-dependency command but must not restore or start that checkout's Scheduled Task.
+- 2026-09-28: The old `OpenReply WSL Runtime` task both keeps WSL alive after sign-in and launches plain Compose, which can run migrations. An owner-approved no-migration cutover must stop and disable that task before manual app-only recovery; leave it stopped throughout rollback and use only explicit `--no-deps` recovery until the owner separately approves a reviewed migration-safe launcher.

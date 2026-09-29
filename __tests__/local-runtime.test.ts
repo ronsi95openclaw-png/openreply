@@ -65,10 +65,28 @@ describe("local PC runtime", () => {
     expect(runbook).toContain(appOnlyStart);
     expect(runbook).toContain("run --rm --no-deps --build migrate");
     expect(runbook).toContain(
-      "Do **not** repoint `OpenReply WSL\nRuntime` at the old checkout or start it"
+      "The task also keeps Ubuntu/WSL\navailable after sign-in"
     );
     expect(runbook).toContain(
-      "does not restore automatic restart after sign-in"
+      "legacy launcher uses plain `docker compose up -d`, which can start\n`migrate`"
+    );
+    const retireOldTask = "### Retire the unsafe Scheduled Task first";
+    const cutover = "### Owner-approved no-migration cutover";
+    const retireOldTaskAt = runbook.indexOf(retireOldTask);
+    const cutoverAt = runbook.indexOf(cutover);
+    expect(retireOldTaskAt).toBeGreaterThanOrEqual(0);
+    expect(cutoverAt).toBeGreaterThan(retireOldTaskAt);
+    expect(
+      runbook.indexOf("Stop-ScheduledTask -TaskName 'OpenReply WSL Runtime'", retireOldTaskAt)
+    ).toBeLessThan(cutoverAt);
+    expect(
+      runbook.indexOf("Disable-ScheduledTask -TaskName 'OpenReply WSL Runtime'", retireOldTaskAt)
+    ).toBeLessThan(cutoverAt);
+    expect(runbook).toContain(
+      "Keep `OpenReply WSL Runtime` stopped and disabled throughout rollback"
+    );
+    expect(runbook).toContain(
+      "A migration requires separate, exact owner\napproval and is not part of rollback"
     );
     expect(runbook).not.toContain("$candidate = $rollback");
   });
