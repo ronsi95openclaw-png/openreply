@@ -7,6 +7,8 @@ import { getSessionUserId } from "@/lib/auth/session";
 const projectRoot = path.resolve(__dirname, "..");
 const validator = path.join(projectRoot, "scripts/validate-local-env.mjs");
 const composeFile = path.join(projectRoot, "docker-compose.local.yml");
+const wslStarter = path.join(projectRoot, "scripts/start-openreply-wsl.ps1");
+const reel3Runbook = path.join(projectRoot, "docs/REEL3_SHIFT_RUNBOOK.md");
 
 function localEnv(
   overrides: Record<string, string | undefined> = {}
@@ -33,6 +35,21 @@ describe("local PC runtime", () => {
     expect(compose).toContain(
       '"${OPENREPLY_BIND_ADDRESS:-127.0.0.1}:${OPENREPLY_HOST_PORT:-3000}:3000"'
     );
+  });
+
+  it("keeps the scheduled clean-runtime startup separate from migrations", () => {
+    const starter = readFileSync(wslStarter, "utf8");
+    const runbook = readFileSync(reel3Runbook, "utf8");
+    const appOnlyStart =
+      "up -d --build --no-deps dashboard worker cron";
+
+    expect(starter).toContain("$PSScriptRoot");
+    expect(starter).toContain("wslpath -a $projectRoot");
+    expect(starter).toContain(".env.local-admin");
+    expect(starter).toContain(appOnlyStart);
+    expect(starter).not.toMatch(/db:migrate|migrate deploy/);
+    expect(runbook).toContain(appOnlyStart);
+    expect(runbook).toContain("run --rm --no-deps --build migrate");
   });
 
   it("keeps a JWT-session user id when the database user is absent", () => {

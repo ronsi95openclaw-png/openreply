@@ -43,16 +43,22 @@ links: [campaigns, delivery]
 
 ## Keep the local stack operational {#local-runtime}
 tech: Docker Compose, Prisma, dashboard, worker, and scheduler.
-files: [Dockerfile, docker-compose.local.yml, docs/local-pc.md]
+files: [Dockerfile, docker-compose.local.yml, scripts/start-openreply-wsl.ps1, __tests__/local-runtime.test.ts, docs/local-pc.md]
 needs: [delivery]
 - [x] Leave the live Docker stack and database untouched during this code-only change {#local-runtime-no-live-change}
   by: codex
+- [x] Start only the reviewed app services during a no-migration cutover {#local-runtime-no-migrate-cutover}
+  by: codex
+  from: agent
 
 ## Record the Reel 3 publishing gates {#runbook}
 tech: Owner-facing operational runbook for asset approval, deployment, repair, staging, and exact-post binding.
 files: [docs/REEL3_SHIFT_RUNBOOK.md, PLAN.md]
 needs: [campaigns, landing-page]
 - [x] Document deployment and post gates without deploying, posting, or changing live campaigns {#runbook-reel3-gates}
+  by: codex
+  from: agent
+- [x] Make the clean-runtime cutover and rollback explicitly migration-safe {#runbook-no-migrate-cutover}
   by: codex
   from: agent
 
@@ -64,3 +70,4 @@ needs: [campaigns, landing-page]
 - 2026-09-28: BRAND is protected and currently has legacy `matchAnyPost: true`; this task must not change it. CHECK remains isolated and unchanged.
 - 2026-09-28: The one-time staged-link repair stays fixed to the original campaign and link identifiers, while exact binding must use the sole currently verified prepared SHIFT campaign and link so an intentionally recreated valid configuration can proceed safely.
 - 2026-09-28: Final Reel 3 asset, caption, profile-grid-safe cover, and audio approval remain owner gates. No Reel video is created in this implementation.
+- 2026-09-28: A clean-runtime cutover or rollback must never use normal Compose dependency startup: dashboard and worker depend on `migrate`, so only an owner-approved schema-state check followed by `up --no-deps` for the explicit app services can keep migration execution separate.

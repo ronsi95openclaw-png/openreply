@@ -40,8 +40,8 @@ The running Compose project is named `openreply` and owns the existing named vol
 `openreply_pgdata` and `openreply_redisdata`. Its current Scheduled Task, `OpenReply WSL Runtime`,
 runs `scripts/start-openreply-wsl.ps1` from the dirty deployment checkout
 `C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy`. That script resolves its own
-directory, then starts `docker compose -p openreply --env-file .env.local -f
-docker-compose.local.yml up -d` inside WSL. The reviewed clean checkout is
+directory, then starts the explicitly named `dashboard`, `worker`, and `cron` services with
+`--no-deps` inside WSL. The reviewed clean checkout is
 `C:\Users\maste\.codex\worktrees\reel3-shift-canonical\openreply`.
 
 The clean checkout needs references to the existing untracked credential files because the Compose
@@ -69,19 +69,47 @@ npm run build
 wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical/openreply -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml config --quiet'
 ```
 
-Only after those checks and an owner-approved cutover, start the clean checkout once with the same
-project name. That deliberately reuses the two existing `openreply_*` volumes; do not supply a new
-project name or run a second worker against the live Instagram account.
+### Migration decision — inspect first; do not run one by accident
+
+The Compose file makes `dashboard` and `worker` depend on `migrate` completing successfully. A
+plain `docker compose up` can therefore invoke `npm run db:migrate`. Do not use it for this
+cutover or rollback.
+
+First confirm that the existing `postgres` and `redis` containers are healthy; they and their
+existing `openreply_*` volumes must stay running throughout this special no-migration restart.
+Then inspect the candidate migration state with a transient command that overrides the `migrate`
+service command. `run ... migrate <command>` does **not** use the service's configured
+`npm run db:migrate` command when an explicit command follows it, and `--no-deps` prevents Compose
+from starting its dependencies:
 
 ```powershell
-wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical/openreply -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml up -d --build'
+wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical/openreply -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml ps postgres redis'
+wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical/openreply -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml run --rm --no-deps --build migrate sh -lc "node scripts/validate-local-env.mjs && npx prisma migrate status"'
+```
+
+If `migrate status` reports pending migrations, stop. Capture its output and obtain fresh owner
+approval for the exact migration before running any migration command. After that separate,
+approved migration and a second clean `migrate status`, return to this runbook. If it reports the
+database is current, obtain the owner’s approval for the no-migration cutover below. No status
+result authorizes a migration implicitly.
+
+### Owner-approved no-migration cutover
+
+Start only the three app services with the existing project name. `--no-deps` is intentional: it
+prevents Compose from following the `dashboard`/`worker` dependency on `migrate`. Because the
+database, Redis, and schema were just confirmed healthy and current, the app services can safely
+reconnect to the already-running dependencies without asking Compose to start them. Do not supply a
+new project name or run a second worker against the live Instagram account.
+
+```powershell
+wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical/openreply -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml up -d --build --no-deps dashboard worker cron'
 wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/.codex/worktrees/reel3-shift-canonical/openreply -- bash -lc 'docker compose -p openreply ps'
 ```
 
 Smoke-check the dashboard, worker, scheduler, database, Redis, public HTTPS health endpoint, and
 `${NEXTAUTH_URL}/shift-handoff`. Do not invoke a tracked redirect, webhook, campaign command, or
 Instagram interaction as a smoke check. Only after those checks succeed, repoint the Scheduled Task
-to the clean checkout's unchanged `scripts/start-openreply-wsl.ps1` and start it. Preserve the
+to the clean checkout's reviewed `scripts/start-openreply-wsl.ps1` and start it. Preserve the
 task's existing trigger, principal, and settings; change only its action.
 
 ```powershell
@@ -94,13 +122,19 @@ Set-ScheduledTask -TaskName 'OpenReply WSL Runtime' -Action $action
 Start-ScheduledTask -TaskName 'OpenReply WSL Runtime'
 ```
 
-If any smoke check fails, keep the task pointed at—or restore it to—the dirty deployment checkout,
-then run that checkout's one-time `docker compose -p openreply --env-file .env.local -f
-docker-compose.local.yml up -d --build` command to restore its images while retaining the same
-volumes. To restore the task action, repeat the block above with `$candidate` set to
-`C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy`, then recheck health before
-restarting it. Do not delete the clean links, the old checkout, either named volume, or either
-credential file until the owner has accepted the clean runtime.
+If any smoke check fails, keep the task pointed at—or restore it to—the dirty deployment checkout.
+Do not use plain `up`: first reconfirm the existing database and Redis are healthy and the schema is
+current, then use the same explicit no-dependency app restart from that checkout:
+
+```powershell
+$rollback = 'C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy'
+wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/OneDrive/Documents/ChatGPT/openreply-reel2-deploy -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml up -d --build --no-deps dashboard worker cron'
+```
+
+To restore the task action, repeat the Scheduled Task block above with `$candidate = $rollback`,
+then recheck health before restarting it. This rollback preserves the same volumes and cannot start
+the Compose `migrate` service. Do not delete the clean links, the old checkout, either named volume,
+or either credential file until the owner has accepted the clean runtime.
 
 ## Repair the existing staged link — only after deployment approval
 
