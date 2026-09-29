@@ -8,6 +8,7 @@ const projectRoot = path.resolve(__dirname, "..");
 const validator = path.join(projectRoot, "scripts/validate-local-env.mjs");
 const composeFile = path.join(projectRoot, "docker-compose.local.yml");
 const wslStarter = path.join(projectRoot, "scripts/start-openreply-wsl.ps1");
+const wslPathResolver = path.join(projectRoot, "scripts/resolve-wsl-path.ps1");
 const reel3Runbook = path.join(projectRoot, "docs/REEL3_SHIFT_RUNBOOK.md");
 
 function localEnv(
@@ -44,13 +45,57 @@ describe("local PC runtime", () => {
       "up -d --build --no-deps dashboard worker cron";
 
     expect(starter).toContain("$PSScriptRoot");
-    expect(starter).toContain("wslpath -a $projectRoot");
+    expect(starter).toContain("resolve-wsl-path.ps1");
     expect(starter).toContain(".env.local-admin");
     expect(starter).toContain(appOnlyStart);
     expect(starter).not.toMatch(/db:migrate|migrate deploy/);
+    const resolver = readFileSync(wslPathResolver, "utf8");
+    expect(resolver).toContain(
+      '.Replace("\\", "/")'
+    );
+    expect(resolver).toContain(
+      "if ($null -eq $wslPathOutput)"
+    );
+    expect(resolver.indexOf("if ($wslExitCode -ne 0)")).toBeLessThan(
+      resolver.indexOf(".Trim()")
+    );
+    expect(resolver.indexOf("if ($null -eq $wslPathOutput)")).toBeLessThan(
+      resolver.indexOf(".Trim()")
+    );
     expect(runbook).toContain(appOnlyStart);
     expect(runbook).toContain("run --rm --no-deps --build migrate");
+    expect(runbook).toContain(
+      "Do **not** repoint `OpenReply WSL\nRuntime` at the old checkout or start it"
+    );
+    expect(runbook).toContain(
+      "does not restore automatic restart after sign-in"
+    );
+    expect(runbook).not.toContain("$candidate = $rollback");
   });
+
+  it.skipIf(process.platform !== "win32")(
+    "converts the actual Windows project path with read-only wslpath",
+    () => {
+      const converted = execFileSync(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          wslPathResolver,
+          "-WindowsPath",
+          projectRoot,
+        ],
+        { encoding: "utf8" }
+      ).trim();
+
+      const windowsSuffix = projectRoot.replace(/\\/g, "/").slice(2);
+      expect(converted).toMatch(/^\/mnt\/[a-z]\//i);
+      expect(converted).toContain(windowsSuffix);
+      expect(converted).not.toContain("\\");
+    }
+  );
 
   it("keeps a JWT-session user id when the database user is absent", () => {
     expect(getSessionUserId(undefined, "jwt-user")).toBe("jwt-user");

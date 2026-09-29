@@ -25,12 +25,10 @@ foreach ($credentialFile in $credentialFiles) {
   }
 }
 
-# Let WSL perform the Windows-to-Linux path conversion so the scheduled task
-# works from any supported drive location, including the clean worktree.
-$wslProjectRoot = (& wsl.exe -d $Distribution -- wslpath -a $projectRoot).Trim()
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($wslProjectRoot)) {
-  throw "Could not resolve the OpenReply project path inside $Distribution."
-}
+# Resolve the actual clean-root Windows path with the reviewed helper. It
+# normalizes backslashes before invoking wslpath and gives actionable failures.
+$wslPathResolver = Join-Path $PSScriptRoot "resolve-wsl-path.ps1"
+$wslProjectRoot = & $wslPathResolver -WindowsPath $projectRoot -Distribution $Distribution
 
 # Do not start Compose dependencies here. dashboard and worker normally depend
 # on migrate; --no-deps keeps migrations a separate, owner-approved action.

@@ -122,19 +122,26 @@ Set-ScheduledTask -TaskName 'OpenReply WSL Runtime' -Action $action
 Start-ScheduledTask -TaskName 'OpenReply WSL Runtime'
 ```
 
-If any smoke check fails, keep the task pointed at—or restore it to—the dirty deployment checkout.
-Do not use plain `up`: first reconfirm the existing database and Redis are healthy and the schema is
-current, then use the same explicit no-dependency app restart from that checkout:
+If any smoke check fails before the Scheduled Task is changed, leave the task action alone. If the
+task has already been changed to the clean checkout, stop it. Do **not** repoint `OpenReply WSL
+Runtime` at the old checkout or start it: its existing launcher uses plain `docker compose up -d`,
+which may invoke `migrate`.
+
+A rollback is manual until the old checkout has its own separately reviewed migration-safe launcher.
+First reconfirm the existing database and Redis are healthy and the schema is current. Then, with
+owner approval, start only the old app services through this explicit no-dependency command:
 
 ```powershell
 $rollback = 'C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy'
 wsl.exe -d Ubuntu --cd /mnt/c/Users/maste/OneDrive/Documents/ChatGPT/openreply-reel2-deploy -- bash -lc 'docker compose -p openreply --env-file .env.local -f docker-compose.local.yml up -d --build --no-deps dashboard worker cron'
 ```
 
-To restore the task action, repeat the Scheduled Task block above with `$candidate = $rollback`,
-then recheck health before restarting it. This rollback preserves the same volumes and cannot start
-the Compose `migrate` service. Do not delete the clean links, the old checkout, either named volume,
-or either credential file until the owner has accepted the clean runtime.
+Recheck health before considering the rollback complete. This command preserves the same volumes and
+cannot start the Compose `migrate` service, but it does not restore automatic restart after sign-in.
+Keep `OpenReply WSL Runtime` stopped and pointed away from the old checkout until a reviewed
+migration-safe rollback launcher is available and the owner approves its use. Do not delete the
+clean links, the old checkout, either named volume, or either credential file until the owner has
+accepted the clean runtime.
 
 ## Repair the existing staged link — only after deployment approval
 

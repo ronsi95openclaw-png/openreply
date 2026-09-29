@@ -43,11 +43,14 @@ links: [campaigns, delivery]
 
 ## Keep the local stack operational {#local-runtime}
 tech: Docker Compose, Prisma, dashboard, worker, and scheduler.
-files: [Dockerfile, docker-compose.local.yml, scripts/start-openreply-wsl.ps1, __tests__/local-runtime.test.ts, docs/local-pc.md]
+files: [Dockerfile, docker-compose.local.yml, scripts/start-openreply-wsl.ps1, scripts/resolve-wsl-path.ps1, __tests__/local-runtime.test.ts, docs/local-pc.md]
 needs: [delivery]
 - [x] Leave the live Docker stack and database untouched during this code-only change {#local-runtime-no-live-change}
   by: codex
 - [x] Start only the reviewed app services during a no-migration cutover {#local-runtime-no-migrate-cutover}
+  by: codex
+  from: agent
+- [x] Convert the scheduled task's Windows checkout path safely inside WSL {#local-runtime-wsl-path}
   by: codex
   from: agent
 
@@ -61,6 +64,9 @@ needs: [campaigns, landing-page]
 - [x] Make the clean-runtime cutover and rollback explicitly migration-safe {#runbook-no-migrate-cutover}
   by: codex
   from: agent
+- [x] Keep rollback manual until its old task has a reviewed safe launcher {#runbook-safe-rollback-task}
+  by: codex
+  from: agent
 
 ## decisions
 
@@ -71,3 +77,4 @@ needs: [campaigns, landing-page]
 - 2026-09-28: The one-time staged-link repair stays fixed to the original campaign and link identifiers, while exact binding must use the sole currently verified prepared SHIFT campaign and link so an intentionally recreated valid configuration can proceed safely.
 - 2026-09-28: Final Reel 3 asset, caption, profile-grid-safe cover, and audio approval remain owner gates. No Reel video is created in this implementation.
 - 2026-09-28: A clean-runtime cutover or rollback must never use normal Compose dependency startup: dashboard and worker depend on `migrate`, so only an owner-approved schema-state check followed by `up --no-deps` for the explicit app services can keep migration execution separate.
+- 2026-09-28: The old deployment checkout's task launcher is not treated as migration-safe. Until it has its own reviewed launcher, a rollback may restart app services through the explicit no-dependency command but must not restore or start that checkout's Scheduled Task.
