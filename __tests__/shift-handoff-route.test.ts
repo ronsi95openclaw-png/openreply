@@ -10,9 +10,9 @@ import { handoffPrompt, metadata } from "../app/shift-handoff/page";
 describe("Shift Handoff landing routes", () => {
   it("keeps the privacy and no-invention safeguards in the canonical prompt", () => {
     expect(metadata.title).toBe("Shift Handoff Prompt | Pour&Prompt");
-    expect(handoffPrompt).toContain("remove guest and employee names");
-    expect(handoffPrompt).toContain("instead of guessing");
-    expect(handoffPrompt).toContain("Do not invent sales targets");
+    expect(handoffPrompt).toContain("Do not include private guest or employee information.");
+    expect(handoffPrompt).toContain("If something important is missing or unclear");
+    expect(handoffPrompt).toContain("Never invent numbers");
   });
 
   it("safely redirects the legacy path to the canonical route", () => {

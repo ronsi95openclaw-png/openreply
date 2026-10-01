@@ -39,7 +39,8 @@ Compose, the database, or either credential file during code review.
 The running Compose project is named `openreply` and owns the existing named volumes
 `openreply_pgdata` and `openreply_redisdata`. Its current Scheduled Task, `OpenReply WSL Runtime`,
 runs from the dirty deployment checkout
-`C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy`. The task also keeps Ubuntu/WSL
+`C:\Users\maste\OneDrive\Documents\ChatGPT\openreply-reel2-deploy`.
+The task also keeps Ubuntu/WSL
 available after sign-in. Its legacy launcher uses plain `docker compose up -d`, which can start
 `migrate`; do not treat that task or launcher as migration-safe. The reviewed clean checkout is
 `C:\Users\maste\.codex\worktrees\reel3-shift-canonical\openreply`.

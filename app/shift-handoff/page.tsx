@@ -23,6 +23,8 @@ Anonymized closing notes: [paste notes]
 Known 86'd items, maintenance issues, staffing changes, or deadlines: [insert]
 Roles available next shift: [insert]`;
 
+export const handoffPrompt = shiftHandoffPrompt;
+
 export const metadata: Metadata = {
   title: "Shift Handoff Prompt | Pour&Prompt",
   description:

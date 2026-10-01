@@ -40,7 +40,7 @@ describe("local PC runtime", () => {
 
   it("keeps the scheduled clean-runtime startup separate from migrations", () => {
     const starter = readFileSync(wslStarter, "utf8");
-    const runbook = readFileSync(reel3Runbook, "utf8");
+    const runbook = readFileSync(reel3Runbook, "utf8").replace(/\r\n/g, "\n");
     const appOnlyStart =
       "up -d --build --no-deps dashboard worker cron";
 
